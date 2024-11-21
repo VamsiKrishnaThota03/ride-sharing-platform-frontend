@@ -23,7 +23,7 @@ function App() {
             <Navbar isLoggedIn={isLoggedIn} setIsLoggedIn={setIsLoggedIn} />
             <div className="container">
                 <Routes>
-                    <Route path="/login" element={<Login setIsLoggedIn={setIsLoggedIn} />} />
+                    <Route path="/" element={<Login setIsLoggedIn={setIsLoggedIn} />} />
                     <Route path="/signup" element={<Signup />} />
                     <Route path="/traveler-dashboard" element={isLoggedIn ? <TravelerDashboard /> : <Login />} />
                     <Route path="/companion-dashboard" element={isLoggedIn ? <CompanionDashboard /> : <Login />} />

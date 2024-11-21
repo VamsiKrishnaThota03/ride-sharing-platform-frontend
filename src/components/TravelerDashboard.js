@@ -15,6 +15,7 @@ const TravelerDashboard = () => {
     };
 
     const tripId = getQueryParams(); // Get tripId from URL
+    console.log(tripId)
 
     return (
         <div className="container mt-4">
@@ -39,16 +40,32 @@ const TravelerDashboard = () => {
                     // Show shared rides if tripId is present
                     <div className="col-md-6">
                         <div className="shared-rides">
-                            <RideHistory tripId={tripId} /> {/* Pass tripId if needed */}
+                            <RideHistory  /> {/* Pass tripId if needed */}
                         </div>
                     </div>
                 )}
             </div>
             {/* Ride History displayed below the Map and Form */}
+            
             <div className="row">
                 <div className="col-12">
                     <div className="ride-history mt-4">
-                        <RideHistory /> {/* You may want to show ride history here without any filter */}
+                        {!tripId ? (
+                        // Show Ride Sharing Form if tripId is not present
+                        // <div className="col-md-6">
+                            <div className="ride-sharing-form">
+                                <RideHistory />
+                            {/* </div> */}
+                        </div>
+                        ) : (
+                        // Show shared rides if tripId is present
+                        <div className="col-md-6">
+                            <div className="shared-rides">
+                                {/* <RideHistory tripId={tripId} /> Pass tripId if needed */}
+                            </div>
+                        </div>
+                        )}
+                        {/* <RideHistory /> You may want to show ride history here without any filter */}
                     </div>
                 </div>
             </div>

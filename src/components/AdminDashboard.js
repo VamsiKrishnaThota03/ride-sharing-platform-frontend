@@ -9,16 +9,17 @@ const AdminDashboard = () => {
     const [error, setError] = useState('');
 
     const token = localStorage.getItem('token');
+    const backendUrl = process.env.REACT_APP_BACKEND_URL; // Use environment variable
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const usersResponse = await axios.get('http://localhost:5001/api/admin/users', {
+                const usersResponse = await axios.get(`${backendUrl}/api/admin/users`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 setUsers(usersResponse.data);
 
-                const feedbacksResponse = await axios.get('http://localhost:5001/api/admin/feedbacks', {
+                const feedbacksResponse = await axios.get(`${backendUrl}/api/admin/feedbacks`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 setFeedbacks(feedbacksResponse.data);
@@ -28,7 +29,7 @@ const AdminDashboard = () => {
         };
 
         fetchData();
-    }, [token]);
+    }, [token, backendUrl]);
 
     return (
         <div className="container mt-5">

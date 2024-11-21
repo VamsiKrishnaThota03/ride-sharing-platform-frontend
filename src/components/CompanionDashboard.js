@@ -11,10 +11,12 @@ const CompanionDashboard = () => {
     const timeZone = 'America/New_York'; // Set your desired time zone here
     const navigate = useNavigate(); // Use the useNavigate hook
 
+    const backendUrl = process.env.REACT_APP_BACKEND_URL; // Use environment variable for backend URL
+
     const fetchRideShares = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.get('http://localhost:5001/api/rides/companion/details', {
+            const response = await axios.get(`${backendUrl}/api/rides/companion/details`, {
                 headers: {
                     Authorization: `Bearer ${token}`
                 }
@@ -38,7 +40,7 @@ const CompanionDashboard = () => {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.post('http://localhost:5001/api/feedback/send', {
+            await axios.post(`${backendUrl}/api/feedback/send`, {
                 rideShareId: ride.tripId,
                 rating: parseInt(rating, 10),
                 comment: comment,
@@ -64,7 +66,7 @@ const CompanionDashboard = () => {
     }, []);
 
     useEffect(() => {
-        const socket = new WebSocket('ws://localhost:5001');
+        const socket = new WebSocket(`${backendUrl.replace(/^http/, 'ws')}`); // Use WebSocket URL from backend
 
         socket.onmessage = (event) => {
             const data = JSON.parse(event.data);
@@ -79,7 +81,7 @@ const CompanionDashboard = () => {
         return () => {
             socket.close();
         };
-    }, []);
+    }, [backendUrl]);
 
     // Function to check if the ride has expired
     const isRideExpired = (createdAt) => {
@@ -116,13 +118,13 @@ const CompanionDashboard = () => {
                             <p><strong>Companion Mobile:</strong> {ride.companionMobile}</p>
                             <p><strong>Created At:</strong> {moment(ride.createdAt).tz(timeZone).format('YYYY-MM-DD HH:mm:ss')}</p>
                             <p className={`status ${isRideExpired(ride.createdAt) ? 'expired' : 'active'}`}>
-                                Status: {isRideExpired(ride.createdAt) ? 'Expired' : 'Active'}
+                                Status: {((isRideExpired(ride.createdAt)) || (!ride.isActive)) ? 'Expired' : 'Active'}
                             </p>
                             <button className="feedback-button" onClick={() => handleFeedbackSubmit(ride)}>
                                 Give Feedback
                             </button>
                             {/* Conditionally render the map link as a button based on ride status */}
-                            {!isRideExpired(ride.createdAt) && (
+                            {!isRideExpired(ride.createdAt) && (ride.isActive) && (
                                 <button 
                                     className="map-button" 
                                     onClick={() => navigate(`/traveler-dashboard?tripId=${ride.tripId}`)} // Navigate to the trip map

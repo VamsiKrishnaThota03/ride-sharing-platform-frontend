@@ -58,23 +58,62 @@ const Signup = () => {
 
         console.log('Form Data:', formData); // Debug log to check form data
         try {
-            const response = await axios.post('http://localhost:5001/api/signup', formData);
+            const response = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/signup`, formData);
             console.log(response.data);
             alert("Signup successful!");
+            setFormData({
+                name: '',
+                email: '',
+                password: '',
+                mobile_number: '',
+                role: 'traveler', // Reset to default role
+            }); // Reset the form data after successful signup
         } catch (error) {
-            console.error("There was an error signing up:", error.response.data);
-            alert("Signup failed: " + error.response.data.message);
+            console.error("There was an error signing up:", error.response?.data || error);
+            alert("Signup failed: " + (error.response ? error.response.data.message : 'Something went wrong'));
         }
     };
 
     return (
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="signup-form">
             <h3>Sign Up</h3>
-            <input type="text" name="name" placeholder="Name" required onChange={handleChange} />
-            <input type="email" name="email" placeholder="Email" required onChange={handleChange} />
-            <input type="password" name="password" placeholder="Password" required onChange={handleChange} />
-            <input type="text" name="mobile_number" placeholder="Mobile Number" required onChange={handleChange} />
-            <select name="role" value={formData.role} onChange={handleChange}>
+            <input 
+                type="text" 
+                name="name" 
+                placeholder="Name" 
+                value={formData.name}
+                onChange={handleChange} 
+                required 
+            />
+            <input 
+                type="email" 
+                name="email" 
+                placeholder="Email" 
+                value={formData.email}
+                onChange={handleChange} 
+                required 
+            />
+            <input 
+                type="password" 
+                name="password" 
+                placeholder="Password" 
+                value={formData.password}
+                onChange={handleChange} 
+                required 
+            />
+            <input 
+                type="text" 
+                name="mobile_number" 
+                placeholder="Mobile Number" 
+                value={formData.mobile_number}
+                onChange={handleChange} 
+                required 
+            />
+            <select 
+                name="role" 
+                value={formData.role} 
+                onChange={handleChange}
+            >
                 <option value="traveler">Traveler</option>
                 <option value="traveler_companion">Traveler Companion</option>
                 <option value="admin">Admin</option>

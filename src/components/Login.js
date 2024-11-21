@@ -9,6 +9,8 @@ const Login = ({ setIsLoggedIn }) => {
     const [error, setError] = useState('');
     const navigate = useNavigate();
 
+    const backendUrl = process.env.REACT_APP_BACKEND_URL; // Use environment variable for backend URL
+
     // Function to validate the form inputs
     const validateForm = () => {
         // Check if email is valid
@@ -37,7 +39,7 @@ const Login = ({ setIsLoggedIn }) => {
         }
 
         try {
-            const response = await axios.post('http://localhost:5001/api/login', { email, password });
+            const response = await axios.post(`${backendUrl}/api/login`, { email, password }); // Use backendUrl
             const token = response.data.token;
             const role = response.data.role;
 

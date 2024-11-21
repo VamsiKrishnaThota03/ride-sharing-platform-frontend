@@ -9,9 +9,9 @@ const RideHistory = () => {
     useEffect(() => {
         const fetchRides = async () => {
             try {
-                const response = await axios.get('http://localhost:5001/api/rides/shared', {
+                const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/rides/shared`, {
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`, // Adjust for your auth method
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
                     }
                 });
                 setRides(response.data);
@@ -19,19 +19,45 @@ const RideHistory = () => {
                 console.error('Error fetching rides:', error);
                 setError('Failed to load ride history. Please try again later.');
             } finally {
-                setLoading(false); // Set loading to false regardless of success or failure
+                setLoading(false);
             }
         };
 
         fetchRides();
     }, []);
 
+    const handleFeedbackSubmit = async (ride) => {
+        const rating = window.prompt("Please enter your rating (1 to 5):");
+        const comment = window.prompt("Please enter your comment:");
+
+        if (!rating || !comment) {
+            alert("Feedback not submitted. Please provide both rating and comment.");
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/feedback/send`, {
+                rideShareId: ride.tripId,
+                rating: parseInt(rating, 10),
+                comment: comment,
+            }, {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
+            alert('Feedback submitted successfully!');
+        } catch (err) {
+            alert('Failed to submit feedback: ' + (err.response ? err.response.data.message : 'Something went wrong'));
+        }
+    };
+
     if (loading) {
-        return <div>Loading...</div>; // Loading state
+        return <div>Loading...</div>;
     }
 
     if (error) {
-        return <div style={{ color: 'red' }}>{error}</div>; // Error state
+        return <div style={{ color: 'red' }}>{error}</div>;
     }
 
     return (
@@ -48,6 +74,7 @@ const RideHistory = () => {
                             <th style={{ border: '1px solid #ddd', padding: '8px' }}>Driver Phone</th>
                             <th style={{ border: '1px solid #ddd', padding: '8px' }}>Cab Number</th>
                             <th style={{ border: '1px solid #ddd', padding: '8px' }}>Date Shared</th>
+                            <th style={{ border: '1px solid #ddd', padding: '8px' }}>Feedback</th> {/* New column for feedback */}
                         </tr>
                     </thead>
                     <tbody>
@@ -58,6 +85,9 @@ const RideHistory = () => {
                                 <td style={{ border: '1px solid #ddd', padding: '8px' }}>{ride.driverPhone}</td>
                                 <td style={{ border: '1px solid #ddd', padding: '8px' }}>{ride.cabNumber}</td>
                                 <td style={{ border: '1px solid #ddd', padding: '8px' }}>{new Date(ride.createdAt).toLocaleString()}</td>
+                                <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+                                    <button onClick={() => handleFeedbackSubmit(ride)}>Give Feedback</button>
+                                </td>
                             </tr>
                         ))}
                     </tbody>

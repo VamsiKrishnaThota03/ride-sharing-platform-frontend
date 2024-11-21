@@ -9,7 +9,6 @@ const RideSharingForm = () => {
     const [companionMobile, setCompanionMobile] = useState('');
     const [loading, setLoading] = useState(false);
     
-    // Hardcoded location for demonstration (replace with actual latitude/longitude)
     const driverLatitude = '37.7749'; 
     const driverLongitude = '-122.4194'; 
 
@@ -22,7 +21,7 @@ const RideSharingForm = () => {
         setLoading(true);
         try {
             // Post the ride details to the server
-            const response = await axios.post('http://localhost:5001/api/rides/share', {
+            const response = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/rides/share`, {
                 tripId,
                 driverName,
                 driverPhone,

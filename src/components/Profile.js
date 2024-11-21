@@ -3,33 +3,54 @@ import axios from 'axios';
 
 const Profile = () => {
     const [userDetails, setUserDetails] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
     const token = localStorage.getItem('token');
+    const backendUrl = process.env.REACT_APP_BACKEND_URL; // Use environment variable
 
     useEffect(() => {
         const fetchUserDetails = async () => {
             try {
-                const response = await axios.get('http://localhost:5001/api/user/profile', {
+                const response = await axios.get(`${backendUrl}/api/user/profile`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 setUserDetails(response.data);
-            } catch (error) {
-                console.error('Error fetching user details:', error);
+            } catch (err) {
+                console.error('Error fetching user details:', err);
+                setError('Failed to fetch user details. Please try again later.');
+            } finally {
+                setLoading(false);
             }
         };
 
         fetchUserDetails();
-    }, [token]);
+    }, [token, backendUrl]);
 
-    if (!userDetails) {
-        return <p>Loading...</p>;
+    if (loading) {
+        return (
+            <div className="text-center mt-5">
+                <div className="spinner-border text-primary" role="status">
+                    <span className="sr-only">Loading...</span>
+                </div>
+                <p>Loading user profile...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="alert alert-danger text-center mt-5" role="alert">
+                {error}
+            </div>
+        );
     }
 
     return (
         <div className="container mt-5">
-            <h2 className="text-center mb-4" style={{ fontSize: '2rem' }}>User Profile</h2>
-            <div className="card">
-                <div className="card-header">
-                    <h5 className="mb-0" style={{ fontSize: '1.5rem' }}>UserName:{userDetails.name}</h5>
+            <h2 className="text-center mb-4" style={{ fontSize: '2rem', fontWeight: 'bold' }}>User Profile</h2>
+            <div className="card shadow">
+                <div className="card-header bg-primary text-white">
+                    <h5 className="mb-0" style={{ fontSize: '1.5rem' }}>User Name: {userDetails.name}</h5>
                 </div>
                 <div className="card-body">
                     <ul className="list-group">
