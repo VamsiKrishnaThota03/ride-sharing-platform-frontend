@@ -1,3 +1,5 @@
+> **📦 Archived:** this repo is kept for history. Active development continues in the combined repository **[Ride-Sharing-Platform](https://github.com/VamsiKrishnaThota03/Ride-Sharing-Platform)**, which contains the same frontend and backend code.
+
 # Ride-Sharing Platform: Frontend
 
 React client for a ride-safety sharing app: travelers share their cab details over WhatsApp, companions follow the trip on a map, and admins review users and feedback.
