@@ -1,70 +1,126 @@
-# Getting Started with Create React App
+# Ride-Sharing Platform: Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+React client for a ride-safety sharing app: travelers share their cab details over WhatsApp, companions follow the trip on a map, and admins review users and feedback.
 
-## Available Scripts
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
+![React Router](https://img.shields.io/badge/React_Router-6-CA4245?logo=reactrouter&logoColor=white)
+![Leaflet](https://img.shields.io/badge/Leaflet-react--leaflet-199900?logo=leaflet&logoColor=white)
+![Axios](https://img.shields.io/badge/Axios-5A29E4?logo=axios&logoColor=white)
+![Vercel](https://img.shields.io/badge/Deployed_on-Vercel-000000?logo=vercel&logoColor=white)
 
-In the project directory, you can run:
+## Live demo
 
-### `npm start`
+https://ride-sharing-platform-frontend.vercel.app
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Overview
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+This is the standalone frontend of the Ride-Sharing Platform, built with Create React App. It talks to the [backend API](https://github.com/VamsiKrishnaThota03/ride-sharing-platform-backend) over REST and WebSockets. The backend address comes from the `REACT_APP_BACKEND_URL` environment variable.
 
-### `npm test`
+### Related repositories
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+| Repository | What it contains |
+|------------|------------------|
+| [ride-sharing-platform-frontend](https://github.com/VamsiKrishnaThota03/ride-sharing-platform-frontend) | **This repo**: the React client, split out for deployment on Vercel |
+| [ride-sharing-platform-backend](https://github.com/VamsiKrishnaThota03/ride-sharing-platform-backend) | Express + PostgreSQL + WebSocket API used by this client |
+| [Ride-Sharing-Platform](https://github.com/VamsiKrishnaThota03/Ride-Sharing-Platform) | Original monorepo with the frontend and backend together (earlier, localhost-only version) |
 
-### `npm run build`
+## Features
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+**All users**
+- Sign up as a Traveler, Traveler Companion or Admin, then log in. The JWT is stored in `localStorage`, and each role is sent to its own dashboard.
+- A profile page and a navbar that loads the logged-in user's profile
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+**Traveler** (`/traveler-dashboard`)
+- Share-ride form (trip ID, driver name, driver phone, cab number, companion mobile). It saves the ride through the API, then opens WhatsApp (`wa.me`) with a pre-filled message that includes a shareable trip link.
+- "Your Shared Rides" history table, with a button to leave feedback on a ride
+- Leaflet / OpenStreetMap view of the trip
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+**Traveler Companion** (`/companion-dashboard`)
+- Cards for every ride shared with the companion's mobile number. The list refreshes every 10 seconds.
+- Rides are shown as *Active* or *Expired* (expired = more than 60 minutes after the ride was shared)
+- "View Map" for active trips and "Give Feedback" (rating 1–5 plus a comment)
+- A notifications panel that listens on a WebSocket for `tripComplete` / `nearbyNotification` messages
 
-### `npm run eject`
+**Admin** (`/admin-dashboard`)
+- Tables of all registered users and all submitted feedback
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### About the map
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+The trip map is a **simulation**. The marker moves in a straight line from a fixed start point (Delhi) to a fixed destination (Hyderabad). It shows a "Nearby Location Reached" banner when close and "Destination Reached" on arrival, and at that point it sends `destinationReached` over the WebSocket so the backend marks the trip inactive. It does not use live GPS.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## Tech stack
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+- React 18 (Create React App / `react-scripts` 5)
+- React Router 6
+- Axios
+- Leaflet + react-leaflet with OpenStreetMap tiles
+- moment-timezone
+- Bootstrap / react-bootstrap (admin dashboard) and plain CSS
 
-## Learn More
+## Project structure
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```
+.
+├── public/                 # index.html, icons, manifest
+└── src/
+    ├── App.js              # Routes
+    ├── index.js
+    └── components/
+        ├── Login.js / Signup.js
+        ├── Navbar.js / Profile.js
+        ├── TravelerDashboard.js   # Map + share form + ride history
+        ├── RideSharingForm.js     # Saves ride, opens WhatsApp share
+        ├── RideHistory.js         # Shared rides + feedback
+        ├── TravelerMap.js         # Simulated trip on Leaflet + WebSocket
+        ├── CompanionDashboard.js  # Rides shared with the companion
+        └── AdminDashboard.js      # Users and feedback
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## Getting started
 
-### Code Splitting
+### Prerequisites
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+- Node.js 18+ and npm
+- A running instance of [ride-sharing-platform-backend](https://github.com/VamsiKrishnaThota03/ride-sharing-platform-backend)
 
-### Analyzing the Bundle Size
+### Install and run
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+```bash
+git clone https://github.com/VamsiKrishnaThota03/ride-sharing-platform-frontend.git
+cd ride-sharing-platform-frontend
+npm install
+npm start          # http://localhost:3000
+```
 
-### Making a Progressive Web App
+### Environment variables
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+Create a `.env` file in the project root:
 
-### Advanced Configuration
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `REACT_APP_BACKEND_URL` | Base URL of the backend API (also used to build the WebSocket URL) | `http://localhost:5001` |
+| `REACT_APP_FRONTEND_URL` | Optional. Public URL of this app, used for the "copy link" button on the map | `http://localhost:3000` |
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+### Scripts
 
-### Deployment
+| Command | Description |
+|---------|-------------|
+| `npm start` | Start the development server |
+| `npm run build` | Create a production build in `build/` |
+| `npm test` | Run the CRA test runner |
+| `npm run eject` | Eject from Create React App (one-way) |
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+## Routes
 
-### `npm run build` fails to minify
+| Path | Page |
+|------|------|
+| `/` | Login |
+| `/signup` | Sign up |
+| `/traveler-dashboard` | Traveler dashboard (`?tripId=` shows a specific trip) |
+| `/companion-dashboard` | Companion dashboard |
+| `/admin-dashboard` | Admin dashboard |
+| `/profile` | User profile |
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+## Contact
+
+Thota Vamsi Krishna — [GitHub](https://github.com/VamsiKrishnaThota03)
