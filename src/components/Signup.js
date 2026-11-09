@@ -1,126 +1,112 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import './Signup.css';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
+import AuthCard from './AuthCard';
+import { BACKEND_URL } from '../config';
+import { dashboardPath, errorMessage } from '../utils/auth';
 
-const Signup = () => {
-    const [formData, setFormData] = useState({
-        name: '',
-        email: '',
-        password: '',
-        mobile_number: '', // Mobile number
-        role: 'traveler', // Default role
-    });
+const emptyForm = { name: '', email: '', password: '', mobile_number: '', role: 'traveler' };
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData({ ...formData, [name]: value });
-    };
+const Signup = ({ session }) => {
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState(emptyForm);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-    const validateForm = () => {
-        const { name, email, password, mobile_number } = formData;
-        
-        // Check if name is provided
-        if (!name) {
-            alert("Name is required.");
-            return false;
-        }
+  if (session) return <Navigate to={dashboardPath(session.role)} replace />;
 
-        // Check if email is valid
-        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailPattern.test(email)) {
-            alert("Please enter a valid email address.");
-            return false;
-        }
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
-        // Check if password meets criteria (at least 6 characters)
-        if (password.length < 6) {
-            alert("Password must be at least 6 characters long.");
-            return false;
-        }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (!/^[0-9]{10}$/.test(formData.mobile_number)) {
+      setError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await axios.post(`${BACKEND_URL}/api/signup`, formData);
+      navigate('/', { state: { signedUp: true } });
+    } catch (err) {
+      setError(errorMessage(err, 'Sign-up failed. Please try again.'));
+      setLoading(false);
+    }
+  };
 
-        // Check if mobile number is valid (assuming it should be 10 digits)
-        const mobilePattern = /^[0-9]{10}$/;
-        if (!mobilePattern.test(mobile_number)) {
-            alert("Please enter a valid mobile number (10 digits).");
-            return false;
-        }
-
-        return true; // All validations passed
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-
-        // Validate the form data
-        if (!validateForm()) {
-            return; // Stop submission if validation fails
-        }
-
-        console.log('Form Data:', formData); // Debug log to check form data
-        try {
-            const response = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/signup`, formData);
-            console.log(response.data);
-            alert("Signup successful!");
-            setFormData({
-                name: '',
-                email: '',
-                password: '',
-                mobile_number: '',
-                role: 'traveler', // Reset to default role
-            }); // Reset the form data after successful signup
-        } catch (error) {
-            console.error("There was an error signing up:", error.response?.data || error);
-            alert("Signup failed: " + (error.response ? error.response.data.message : 'Something went wrong'));
-        }
-    };
-
-    return (
-        <form onSubmit={handleSubmit} className="signup-form">
-            <h3>Sign Up</h3>
-            <input 
-                type="text" 
-                name="name" 
-                placeholder="Name" 
-                value={formData.name}
-                onChange={handleChange} 
-                required 
+  return (
+    <AuthCard
+      title="Create your account"
+      subtitle="Choose Traveler to share rides, or Companion to follow them."
+      footer={<>Already have an account? <Link to="/">Log in</Link></>}
+    >
+      {error && <div className="alert alert-danger py-2" role="alert">{error}</div>}
+      <form onSubmit={handleSubmit}>
+        <fieldset className="mb-3">
+          <legend className="form-label fs-6">I am a</legend>
+          <div className="role-toggle" role="radiogroup">
+            {[
+              ['traveler', 'Traveler', 'I share my rides'],
+              ['traveler_companion', 'Companion', 'I follow rides'],
+            ].map(([value, label, hint]) => (
+              <label key={value} className={`role-option ${formData.role === value ? 'is-selected' : ''}`}>
+                <input type="radio" name="role" value={value} checked={formData.role === value} onChange={handleChange} />
+                <strong>{label}</strong>
+                <span>{hint}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <div className="mb-3">
+          <label htmlFor="signup-name" className="form-label">Full name</label>
+          <input id="signup-name" type="text" name="name" className="form-control" autoComplete="name" value={formData.name} onChange={handleChange} required />
+        </div>
+        <div className="mb-3">
+          <label htmlFor="signup-email" className="form-label">Email address</label>
+          <input id="signup-email" type="email" name="email" className="form-control" autoComplete="email" value={formData.email} onChange={handleChange} required />
+        </div>
+        <div className="row g-3 mb-4">
+          <div className="col-sm-6">
+            <label htmlFor="signup-mobile" className="form-label">Mobile number</label>
+            <input
+              id="signup-mobile"
+              type="tel"
+              name="mobile_number"
+              className="form-control"
+              inputMode="numeric"
+              pattern="[0-9]{10}"
+              maxLength={10}
+              placeholder="10 digits"
+              autoComplete="tel-national"
+              value={formData.mobile_number}
+              onChange={handleChange}
+              required
             />
-            <input 
-                type="email" 
-                name="email" 
-                placeholder="Email" 
-                value={formData.email}
-                onChange={handleChange} 
-                required 
+          </div>
+          <div className="col-sm-6">
+            <label htmlFor="signup-password" className="form-label">Password</label>
+            <input
+              id="signup-password"
+              type="password"
+              name="password"
+              className="form-control"
+              minLength={6}
+              placeholder="6+ characters"
+              autoComplete="new-password"
+              value={formData.password}
+              onChange={handleChange}
+              required
             />
-            <input 
-                type="password" 
-                name="password" 
-                placeholder="Password" 
-                value={formData.password}
-                onChange={handleChange} 
-                required 
-            />
-            <input 
-                type="text" 
-                name="mobile_number" 
-                placeholder="Mobile Number" 
-                value={formData.mobile_number}
-                onChange={handleChange} 
-                required 
-            />
-            <select 
-                name="role" 
-                value={formData.role} 
-                onChange={handleChange}
-            >
-                <option value="traveler">Traveler</option>
-                <option value="traveler_companion">Traveler Companion</option>
-                <option value="admin">Admin</option>
-            </select>
-            <button type="submit">Sign Up</button>
-        </form>
-    );
+          </div>
+        </div>
+        <p className="form-text mt-n2 mb-4">Companions see rides that travelers share with this mobile number.</p>
+        <button type="submit" className="btn btn-primary btn-lg w-100" disabled={loading}>
+          {loading && <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />}
+          {loading ? 'Creating account…' : 'Sign up'}
+        </button>
+      </form>
+    </AuthCard>
+  );
 };
 
 export default Signup;

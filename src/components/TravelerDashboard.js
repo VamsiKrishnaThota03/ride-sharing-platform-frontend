@@ -1,76 +1,80 @@
-import React from 'react';
-import { useLocation } from 'react-router-dom';
+import React, { useCallback, useEffect, useState } from 'react';
+import axios from 'axios';
+import { Link, useLocation } from 'react-router-dom';
 import TravelerMap from './TravelerMap';
 import RideSharingForm from './RideSharingForm';
 import RideHistory from './RideHistory';
-import './TravelerDashboard.css';
+import { BACKEND_URL } from '../config';
+import { authHeader, dashboardPath, errorMessage } from '../utils/auth';
 
-const TravelerDashboard = () => {
-    const location = useLocation();
+const TravelerDashboard = ({ session }) => {
+  const location = useLocation();
+  const tripId = new URLSearchParams(location.search).get('tripId');
+  const isTraveler = session?.role === 'traveler';
 
-    // Function to extract the tripId from the URL query parameters
-    const getQueryParams = () => {
-        const params = new URLSearchParams(location.search);
-        return params.get('tripId');
-    };
+  const [rides, setRides] = useState([]);
+  const [loading, setLoading] = useState(isTraveler);
+  const [error, setError] = useState('');
 
-    const tripId = getQueryParams(); // Get tripId from URL
-    console.log(tripId)
+  const loadRides = useCallback(async () => {
+    try {
+      const { data } = await axios.get(`${BACKEND_URL}/api/rides/shared`, { headers: authHeader() });
+      setRides(data);
+      setError('');
+    } catch (err) {
+      setError(errorMessage(err, 'Failed to load ride history. Please try again later.'));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
+  useEffect(() => {
+    if (isTraveler) loadRides();
+  }, [isTraveler, loadRides]);
+
+  if (tripId) {
     return (
-        <div className="container mt-4">
-            {/* Change heading based on tripId presence */}
-            <h1>{tripId ? 'Traveler Live Location' : 'Traveler Dashboard'}</h1>
-            <div className="row mb-4">
-                {/* Traveler Map on the left side */}
-                <div className="col-md-6">
-                    <div className="traveler-map">
-                        <TravelerMap />
-                    </div>
-                </div>
-                {/* Conditional rendering based on tripId */}
-                {!tripId ? (
-                    // Show Ride Sharing Form if tripId is not present
-                    <div className="col-md-6">
-                        <div className="ride-sharing-form">
-                            <RideSharingForm />
-                        </div>
-                    </div>
-                ) : (
-                    // Show shared rides if tripId is present
-                    <div className="col-md-6">
-                        <div className="shared-rides">
-                            <RideHistory  /> {/* Pass tripId if needed */}
-                        </div>
-                    </div>
-                )}
-            </div>
-            {/* Ride History displayed below the Map and Form */}
-            
-            <div className="row">
-                <div className="col-12">
-                    <div className="ride-history mt-4">
-                        {!tripId ? (
-                        // Show Ride Sharing Form if tripId is not present
-                        // <div className="col-md-6">
-                            <div className="ride-sharing-form">
-                                <RideHistory />
-                            {/* </div> */}
-                        </div>
-                        ) : (
-                        // Show shared rides if tripId is present
-                        <div className="col-md-6">
-                            <div className="shared-rides">
-                                {/* <RideHistory tripId={tripId} /> Pass tripId if needed */}
-                            </div>
-                        </div>
-                        )}
-                        {/* <RideHistory /> You may want to show ride history here without any filter */}
-                    </div>
-                </div>
-            </div>
+      <div className="container py-4">
+        <div className="page-heading">
+          <div>
+            <p className="eyebrow mb-1">Live trip</p>
+            <h1 className="h3 mb-0">Traveler live location</h1>
+          </div>
+          <Link to={dashboardPath(session?.role)} className="btn btn-light">Back to dashboard</Link>
         </div>
+        <div className="live-map">
+          <TravelerMap tripId={tripId} />
+        </div>
+      </div>
     );
+  }
+
+  return (
+    <div className="container py-4">
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow mb-1">Traveler</p>
+          <h1 className="h3 mb-0">Traveler dashboard</h1>
+        </div>
+      </div>
+
+      {!isTraveler ? (
+        <div className="alert alert-info">Only travelers can share rides. Open a shared trip from your dashboard to follow it.</div>
+      ) : (
+        <>
+          <div className="row g-4 mb-4">
+            <div className="col-lg-5">
+              <RideSharingForm onShared={loadRides} />
+            </div>
+            <div className="col-lg-7">
+              <TravelerMap />
+            </div>
+          </div>
+          <RideHistory rides={rides} loading={loading} error={error} onChange={loadRides} />
+        </>
+      )}
+    </div>
+  );
 };
 
 export default TravelerDashboard;

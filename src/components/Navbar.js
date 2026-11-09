@@ -1,131 +1,78 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import React, { useState } from 'react';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { ROLE_LABELS, dashboardPath } from '../utils/auth';
 
-const Navbar = ({ isLoggedIn, setIsLoggedIn }) => {
-    const navigate = useNavigate();
-    const [userDetails, setUserDetails] = useState(null);
-    const [role, setRole] = useState(null);
+const BrandMark = () => (
+  <svg width="30" height="30" viewBox="0 0 64 64" aria-hidden="true">
+    <rect width="64" height="64" rx="16" fill="#14b8a6" />
+    <path d="M32 12c-8.3 0-15 6.5-15 14.6C17 37.5 32 52 32 52s15-14.5 15-25.4C47 18.5 40.3 12 32 12z" fill="#fff" />
+    <circle cx="32" cy="27" r="6" fill="#0f766e" />
+  </svg>
+);
 
-    const backendUrl = process.env.REACT_APP_BACKEND_URL; // Use environment variable
+const Navbar = ({ session, onLogout }) => {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
 
-    useEffect(() => {
-        const storedRole = localStorage.getItem('role');
-        if (storedRole) {
-            setRole(storedRole);
-        }
-    }, []);
+  const links = session
+    ? [
+        { to: dashboardPath(session.role), label: 'Dashboard' },
+        { to: '/profile', label: 'Profile' },
+      ]
+    : [
+        { to: '/', label: 'Log in' },
+        { to: '/signup', label: 'Sign up' },
+      ];
 
-    const handleLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('role');
-        localStorage.removeItem('isLoggedIn');
-        setIsLoggedIn(false);
-        navigate('/');
-    };
+  const handleLogout = () => {
+    setOpen(false);
+    onLogout();
+    navigate('/');
+  };
 
-    const handleProfileClick = async () => {
-        const token = localStorage.getItem('token');
-        try {
-            const response = await axios.get(`${backendUrl}/api/user/profile`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            setUserDetails(response.data);
-            navigate('/profile', { state: { userDetails: response.data } }); // Pass data to profile page
-        } catch (error) {
-            console.error('Error fetching user details:', error);
-        }
-    };
-
-    const handleDashboardClick = () => {
-        if (role === 'traveler') {
-            navigate('/traveler-dashboard');
-        } else if (role === 'traveler_companion') {
-            navigate('/companion-dashboard');
-        } else if (role === 'admin') {
-            navigate('/admin-dashboard');
-        }
-    };
-
-    return (
-        <nav className="navbar navbar-expand-lg navbar-dark bg-dark sticky-top" style={{ padding: '0.5rem 1rem' }}>
-            <Link className="navbar-brand" to="/" style={{ fontSize: '1.5rem' }}>
-                Ride Sharing Platform
-            </Link>
-            <button
-                className="navbar-toggler"
-                type="button"
-                data-toggle="collapse"
-                data-target="#navbarNav"
-                aria-controls="navbarNav"
-                aria-expanded="false"
-                aria-label="Toggle navigation"
-            >
-                <span className="navbar-toggler-icon"></span>
-            </button>
-            <div className="collapse navbar-collapse" id="navbarNav">
-                <ul className="navbar-nav ml-auto">
-                    {!isLoggedIn ? (
-                        <>
-                            <li className="nav-item">
-                                <Link className="nav-link" to="/">
-                                    Login
-                                </Link>
-                            </li>
-                            <li className="nav-item">
-                                <Link className="nav-link" to="/signup">
-                                    Signup
-                                </Link>
-                            </li>
-                        </>
-                    ) : (
-                        <>
-                            <li className="nav-item">
-                                <button className="btn btn-link nav-link" onClick={handleProfileClick}>
-                                    Profile
-                                </button>
-                            </li>
-                            <li className="nav-item">
-                                <button className="btn btn-link nav-link" onClick={handleDashboardClick}>
-                                    Dashboard
-                                </button>
-                            </li>
-                            <li className="nav-item">
-                                <button className="btn btn-link nav-link" onClick={() => navigate('/traveler-dashboard')}>
-                                    Share Ride
-                                </button>
-                            </li>
-                            <li className="nav-item">
-                                <button className="btn btn-link nav-link" onClick={handleLogout}>
-                                    Logout
-                                </button>
-                            </li>
-                        </>
-                    )}
-                </ul>
-            </div>
-            <style jsx>{`
-                .nav-link {
-                    color: #ffffff;
-                    font-size: 1.2rem;
-                    padding: 0.75rem 1rem;
-                    display: flex;
-                    align-items: center;
-                    transition: color 0.3s;
-                }
-                .nav-link:hover {
-                    color: #00c4ff;
-                }
-                .navbar-brand {
-                    font-size: 1.5rem;
-                    font-weight: bold;
-                }
-                .btn-link {
-                    text-decoration: none;
-                }
-            `}</style>
-        </nav>
-    );
+  return (
+    <nav className="navbar navbar-expand-md navbar-dark app-navbar sticky-top">
+      <div className="container">
+        <Link className="navbar-brand d-flex align-items-center gap-2" to={session ? dashboardPath(session.role) : '/'}>
+          <BrandMark />
+          <span>Ride Sharing <span className="brand-muted">Platform</span></span>
+        </Link>
+        <button
+          className="navbar-toggler"
+          type="button"
+          aria-controls="main-nav"
+          aria-expanded={open}
+          aria-label="Toggle navigation"
+          onClick={() => setOpen(!open)}
+        >
+          <span className="navbar-toggler-icon" />
+        </button>
+        <div className={`collapse navbar-collapse ${open ? 'show' : ''}`} id="main-nav">
+          <ul className="navbar-nav ms-auto align-items-md-center gap-md-1">
+            {links.map((link) => (
+              <li className="nav-item" key={link.to}>
+                <NavLink className="nav-link" to={link.to} end onClick={() => setOpen(false)}>
+                  {link.label}
+                </NavLink>
+              </li>
+            ))}
+            {session && (
+              <>
+                <li className="nav-item d-none d-md-block">
+                  <span className="role-chip">{ROLE_LABELS[session.role] || session.role}</span>
+                </li>
+                <li className="nav-item">
+                  <button type="button" className="btn btn-sm btn-outline-light ms-md-2 my-2 my-md-0" onClick={handleLogout}>
+                    Log out
+                  </button>
+                </li>
+              </>
+            )}
+          </ul>
+        </div>
+      </div>
+    </nav>
+  );
 };
 
 export default Navbar;

@@ -1,149 +1,213 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { useLocation } from 'react-router-dom';
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+import { FRONTEND_URL, WS_URL } from '../config';
+import { getToken } from '../utils/auth';
+import { distanceKm, formatDuration, interpolate } from '../utils/geo';
 
-const TravelerMap = () => {
-    const location = useLocation();
+// Webpack does not resolve Leaflet's default icon paths, so set them explicitly.
+const defaultIcon = L.icon({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
 
-    // Extract tripId from URL query parameters
-    const getQueryParams = () => {
-        const params = new URLSearchParams(location.search);
-        return params.get('tripId');
-    };
+const travelerIcon = L.divIcon({
+  className: 'traveler-marker',
+  html: '<span></span>',
+  iconSize: [22, 22],
+  iconAnchor: [11, 11],
+});
 
-    const tripId = getQueryParams(); // Get tripId from URL
-    const [position, setPosition] = useState([28.6139, 77.2090]); // Initial position (Delhi)
-    const [destination] = useState([17.385044, 78.486671]); // Destination (Hyderabad)
-    const [estimatedTime] = useState(18000000); // Estimated time (5 hours)
-    const ws = useRef(null);
-    const speed = 0.04; // Speed adjustment
-    const [alerted, setAlerted] = useState(false);
-    const [alertMessage, setAlertMessage] = useState(''); // Alert message state
+// The demo trip: Delhi to Hyderabad, replayed in about a minute.
+const START = [28.6139, 77.209];
+const DESTINATION = [17.385044, 78.486671];
+const TOTAL_STEPS = 120;
+const TICK_MS = 500;
+const ASSUMED_SPEED_KMH = 60;
+const NEARBY_KM = 150;
 
-    // Send message over WebSocket
-    const sendMessage = (message) => {
-        if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-            ws.current.send(JSON.stringify(message));
-        } else {
-            console.warn('WebSocket is not open. Message not sent:', message);
+const FollowPosition = ({ position }) => {
+  const map = useMap();
+  useEffect(() => {
+    map.panTo(position, { animate: true });
+  }, [map, position]);
+  return null;
+};
+
+const TravelerMap = ({ tripId }) => {
+  const [step, setStep] = useState(0);
+  const [livePosition, setLivePosition] = useState(null);
+  const [connection, setConnection] = useState(tripId ? 'connecting' : 'demo');
+  const [isOwner, setIsOwner] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [copied, setCopied] = useState(false);
+  const ws = useRef(null);
+  const sentNearby = useRef(false);
+  const sentArrival = useRef(false);
+
+  const simulated = useMemo(() => interpolate(START, DESTINATION, step / TOTAL_STEPS), [step]);
+  const position = livePosition || simulated;
+  const remainingKm = distanceKm(position, DESTINATION);
+  const arrived = step >= TOTAL_STEPS || remainingKm < 1;
+
+  // Trip WebSocket (only for a shared trip).
+  useEffect(() => {
+    if (!tripId) return undefined;
+    let attempts = 0;
+    let stopped = false;
+    let retryTimer;
+
+    const connect = () => {
+      const socket = new WebSocket(`${WS_URL}/?tripId=${encodeURIComponent(tripId)}&token=${encodeURIComponent(getToken() || '')}`);
+      ws.current = socket;
+
+      socket.onopen = () => {
+        attempts = 0;
+        setConnection('live');
+      };
+      socket.onmessage = (event) => {
+        let data;
+        try {
+          data = JSON.parse(event.data);
+        } catch {
+          return;
         }
+        if (data.type === 'joined') setIsOwner(Boolean(data.isOwner));
+        if (data.type === 'position') setLivePosition([data.lat, data.lon]);
+        if (data.type === 'tripComplete') {
+          setNotice(data.message || 'The traveler has reached the destination.');
+          setStep(TOTAL_STEPS);
+        }
+      };
+      socket.onclose = (event) => {
+        if (stopped) return;
+        if (event.code === 4004) {
+          setConnection('ended');
+          return setNotice('This trip is no longer active.');
+        }
+        if (event.code === 4003 || event.code === 4001) {
+          setConnection('denied');
+          return setNotice('You do not have access to live updates for this trip.');
+        }
+        setConnection('offline');
+        if (attempts < 5) {
+          attempts += 1;
+          retryTimer = setTimeout(connect, 1000 * attempts);
+        }
+      };
     };
 
-    // Connect to WebSocket server
-    useEffect(() => {
-        const connectWebSocket = () => {
-            if (tripId) {
-                const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5001';
-                ws.current = new WebSocket(`${backendUrl}/?tripId=${tripId}`);
-
-                ws.current.onopen = () => {
-                    console.log('WebSocket connection established');
-                    sendMessage({ type: 'initialPosition', lat: position[0], lon: position[1] });
-                };
-
-                ws.current.onmessage = (event) => {
-                    const newPosition = JSON.parse(event.data);
-                    setPosition([newPosition.lat, newPosition.lon]);
-                };
-
-                ws.current.onerror = (error) => {
-                    console.error('WebSocket error:', error);
-                };
-
-                ws.current.onclose = () => {
-                    console.log('WebSocket connection closed. Attempting to reconnect...');
-                    setTimeout(connectWebSocket, 1000); // Try reconnecting
-                };
-            } else {
-                console.warn('No tripId provided. WebSocket connection not established.');
-            }
-        };
-
-        connectWebSocket();
-
-        return () => {
-            if (ws.current) ws.current.close();
-        };
-    }, [tripId, position]);
-
-    // Update position every 100ms
-    useEffect(() => {
-        const interval = setInterval(() => {
-            const latDiff = destination[0] - position[0];
-            const lonDiff = destination[1] - position[1];
-            const distance = Math.sqrt(latDiff ** 2 + lonDiff ** 2);
-
-            if (distance <= 5 && !alerted) {
-                setAlertMessage('Nearby Location Reached'); // Set alert
-                setAlerted(true); // Trigger alert once
-            }
-
-            if (distance < speed) {
-                setPosition(destination); // Snap to destination
-                clearInterval(interval);
-                sendMessage({ type: 'destinationReached' });
-                setAlertMessage('Destination Reached'); // Set destination reached message
-            } else {
-                const newLat = position[0] + (latDiff / distance) * speed;
-                const newLon = position[1] + (lonDiff / distance) * speed;
-                setPosition([newLat, newLon]);
-                sendMessage({ type: 'updatePosition', lat: newLat, lon: newLon });
-            }
-        }, 100);
-
-        return () => clearInterval(interval); // Cleanup interval
-    }, [position, destination, speed, alerted]);
-
-    // Path for polyline
-    const path = [position, destination];
-
-    // Handle share link generation
-    const handleShareLink = () => {
-        const shareableLink = `${process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000'}/traveler-dashboard?tripId=${tripId}`;
-        navigator.clipboard.writeText(shareableLink)
-            .then(() => alert('Link copied to clipboard!'))
-            .catch(err => console.error('Error copying link: ', err));
+    connect();
+    return () => {
+      stopped = true;
+      clearTimeout(retryTimer);
+      ws.current?.close();
     };
+  }, [tripId]);
 
-    return (
+  // Replay the simulated trip unless we are following live updates from the traveler.
+  useEffect(() => {
+    if (livePosition || arrived) return undefined;
+    const timer = setInterval(() => setStep((s) => Math.min(TOTAL_STEPS, s + 1)), TICK_MS);
+    return () => clearInterval(timer);
+  }, [livePosition, arrived]);
+
+  // The trip owner broadcasts progress to the companion.
+  useEffect(() => {
+    const socket = ws.current;
+    if (!isOwner || !socket || socket.readyState !== WebSocket.OPEN) return;
+    const send = (message) => socket.send(JSON.stringify(message));
+
+    send({ type: 'updatePosition', lat: simulated[0], lon: simulated[1] });
+    if (!sentNearby.current && remainingKm <= NEARBY_KM) {
+      sentNearby.current = true;
+      send({ type: 'nearby' });
+    }
+    if (!sentArrival.current && arrived) {
+      sentArrival.current = true;
+      send({ type: 'destinationReached' });
+    }
+  }, [isOwner, simulated, remainingKm, arrived]);
+
+  const shareLink = tripId ? `${FRONTEND_URL}/traveler-dashboard?tripId=${encodeURIComponent(tripId)}` : '';
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setNotice(`Copy this link: ${shareLink}`);
+    }
+  };
+
+  const statusLabel = {
+    demo: 'Demo route',
+    connecting: 'Connecting…',
+    live: livePosition ? 'Live from traveler' : 'Connected',
+    offline: 'Reconnecting…',
+    ended: 'Trip ended',
+    denied: 'No live access',
+  }[connection];
+
+  return (
+    <div className="card app-card map-card h-100">
+      <div className="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
         <div>
-            {tripId ? <h2>Map for Trip ID: {tripId}</h2> : <h2>Map View</h2>}
-
-            <MapContainer center={position} zoom={6} style={{ height: '100vh', width: '100%' }} zoomControl={false}>
-                <TileLayer
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                />
-                <Polyline positions={path} color="red" />
-                <Marker position={position} icon={new L.Icon.Default()}>
-                    <Popup>Traveler is here.</Popup>
-                </Marker>
-                <Marker position={destination} icon={new L.Icon.Default()}>
-                    <Popup>Destination (Hyderabad).</Popup>
-                </Marker>
-                <div className="leaflet-control-zoom leaflet-bar leaflet-control leaflet-control-zoom" style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 1000 }}>
-                    <a href="#" className="leaflet-control-zoom-in" title="Zoom in" aria-label="Zoom in">+</a>
-                    <a href="#" className="leaflet-control-zoom-out" title="Zoom out" aria-label="Zoom out">-</a>
-                </div>
-            </MapContainer>
-
-            <div style={{ marginTop: '20px' }}>
-                <p>Estimated Time to Destination: {(estimatedTime / 60000).toFixed(2)} minutes</p>
-            </div>
-
-            {/* Display alert message */}
-            {alertMessage && (
-                <div style={{ position: 'absolute', top: '10px', left: '10px', background: 'white', padding: '10px', border: '1px solid black', zIndex: 1000 }}>
-                    {alertMessage}
-                </div>
-            )}
-
-            <button onClick={handleShareLink} style={{ position: 'absolute', bottom: '10px', left: '10px' }}>
-                Share Trip Link
-            </button>
+          <h2 className="h6 mb-0">{tripId ? `Trip ${tripId}` : 'Route preview'}</h2>
+          <small className="text-secondary">Delhi → Hyderabad (simulated)</small>
         </div>
-    );
+        <span className={`status-dot status-dot--${connection}`}>{statusLabel}</span>
+      </div>
+
+      <div className="map-frame">
+        <MapContainer bounds={[START, DESTINATION]} boundsOptions={{ padding: [30, 30] }} scrollWheelZoom={false} className="leaflet-map">
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          />
+          <Polyline positions={[START, DESTINATION]} pathOptions={{ color: '#94a3b8', dashArray: '6 8', weight: 3 }} />
+          <Polyline positions={[START, position]} pathOptions={{ color: '#0d9488', weight: 4 }} />
+          <Marker position={START} icon={defaultIcon}><Popup>Start: Delhi</Popup></Marker>
+          <Marker position={DESTINATION} icon={defaultIcon}><Popup>Destination: Hyderabad</Popup></Marker>
+          <Marker position={position} icon={travelerIcon}><Popup>Traveler is here</Popup></Marker>
+          {tripId && <FollowPosition position={position} />}
+        </MapContainer>
+        {(notice || (arrived && !tripId)) && (
+          <div className="map-toast" role="status">{notice || 'Destination reached'}</div>
+        )}
+      </div>
+
+      <div className="card-body">
+        <div className="row g-3 text-center trip-stats">
+          <div className="col-4">
+            <div className="stat-label">Distance left</div>
+            <div className="stat-value">{arrived ? '0 km' : `${Math.round(remainingKm)} km`}</div>
+          </div>
+          <div className="col-4">
+            <div className="stat-label">ETA at {ASSUMED_SPEED_KMH} km/h</div>
+            <div className="stat-value">{arrived ? 'Arrived' : formatDuration(remainingKm / ASSUMED_SPEED_KMH)}</div>
+          </div>
+          <div className="col-4">
+            <div className="stat-label">Progress</div>
+            <div className="stat-value">{Math.round((1 - remainingKm / distanceKm(START, DESTINATION)) * 100)}%</div>
+          </div>
+        </div>
+        {tripId && (
+          <button type="button" className="btn btn-outline-primary w-100 mt-3" onClick={copyLink}>
+            {copied ? 'Link copied' : 'Copy trip link'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
 };
 
 export default TravelerMap;

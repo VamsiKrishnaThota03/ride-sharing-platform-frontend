@@ -1,103 +1,80 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
-import './Login.css'; // Import the CSS file
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import AuthCard from './AuthCard';
+import { BACKEND_URL } from '../config';
+import { dashboardPath, errorMessage, saveSession } from '../utils/auth';
 
-const Login = ({ setIsLoggedIn }) => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-    const navigate = useNavigate();
+const Login = ({ session, onLogin }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-    const backendUrl = process.env.REACT_APP_BACKEND_URL; // Use environment variable for backend URL
+  if (session) return <Navigate to={location.state?.from || dashboardPath(session.role)} replace />;
 
-    // Function to validate the form inputs
-    const validateForm = () => {
-        // Check if email is valid
-        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailPattern.test(email)) {
-            setError("Please enter a valid email address.");
-            return false;
-        }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const { data } = await axios.post(`${BACKEND_URL}/api/login`, { email, password });
+      saveSession(data.token, data.role);
+      onLogin();
+      navigate(location.state?.from || dashboardPath(data.role), { replace: true });
+    } catch (err) {
+      setError(errorMessage(err, 'An error occurred during login. Please try again.'));
+      setPassword('');
+      setLoading(false);
+    }
+  };
 
-        // Check if password is provided
-        if (!password) {
-            setError("Password is required.");
-            return false;
-        }
-
-        return true; // All validations passed
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError(''); // Clear any previous errors
-
-        // Validate the form data
-        if (!validateForm()) {
-            return; // Stop submission if validation fails
-        }
-
-        try {
-            const response = await axios.post(`${backendUrl}/api/login`, { email, password }); // Use backendUrl
-            const token = response.data.token;
-            const role = response.data.role;
-
-            // Store the token and role in local storage
-            localStorage.setItem('token', token);
-            localStorage.setItem('role', role); 
-            localStorage.setItem('isLoggedIn', 'true');
-
-            setIsLoggedIn(role);
-
-            if (role === 'traveler') {
-                navigate('/traveler-dashboard');
-            } else if (role === 'traveler_companion') {
-                const rideShareDetails = response.data.rideShareDetails;
-                console.log(rideShareDetails);
-                navigate('/companion-dashboard');
-            } else if (role === 'admin') {
-                navigate('/admin-dashboard');
-            }
-        } catch (err) {
-            setError(err.response?.data?.message || 'An error occurred during login. Please try again.');
-        } finally {
-            setEmail('');
-            setPassword('');
-        }
-    };
-
-    return (
-        <div className="container">
-            <form onSubmit={handleSubmit}>
-                <h2>Login</h2>
-                {error && <div className="alert alert-danger">{error}</div>}
-                <div className="form-group">
-                    <label>Email address</label>
-                    <input
-                        type="email"
-                        className="form-control"
-                        placeholder="Enter email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                    />
-                </div>
-                <div className="form-group">
-                    <label>Password</label>
-                    <input
-                        type="password"
-                        className="form-control"
-                        placeholder="Password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                    />
-                </div>
-                <button type="submit" className="btn btn-primary">Login</button>
-            </form>
+  return (
+    <AuthCard
+      title="Welcome back"
+      subtitle="Log in to share a ride or follow one."
+      footer={<>New here? <Link to="/signup">Create an account</Link></>}
+    >
+      {location.state?.signedUp && (
+        <div className="alert alert-success py-2" role="status">Account created. You can log in now.</div>
+      )}
+      {error && <div className="alert alert-danger py-2" role="alert">{error}</div>}
+      <form onSubmit={handleSubmit}>
+        <div className="mb-3">
+          <label htmlFor="login-email" className="form-label">Email address</label>
+          <input
+            id="login-email"
+            type="email"
+            className="form-control form-control-lg"
+            placeholder="you@example.com"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
         </div>
-    );
+        <div className="mb-4">
+          <label htmlFor="login-password" className="form-label">Password</label>
+          <input
+            id="login-password"
+            type="password"
+            className="form-control form-control-lg"
+            placeholder="Your password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
+        <button type="submit" className="btn btn-primary btn-lg w-100" disabled={loading}>
+          {loading && <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />}
+          {loading ? 'Logging in…' : 'Log in'}
+        </button>
+      </form>
+    </AuthCard>
+  );
 };
 
 export default Login;
